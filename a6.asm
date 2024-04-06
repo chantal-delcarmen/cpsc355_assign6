@@ -19,11 +19,12 @@ define(term_r, d5)
 define(accumulate_r, d6)
 define(one_r, d7)
 define(method_r, d8)
-define(power_r, d9)
+define(exp_r, d9)
 define(i_r, d10)
 define(flag_r, d11)
 define(const_r, d12)
 define(temp_r, d13)
+define(iter_r, d14)
 
 buf_size = 8
 alloc   = -(16 + buf_size) & -16
@@ -52,7 +53,7 @@ open_file:  mov     w0, -100                    // 1st argument
             svc     0                           // Supervisor call to system
             mov     fd_r, w0                    // fd (file descriptor) is in w0 and moved into fd reg
 
-            mov     i_r, one_r                  // Initalize i = 1
+            mov     iter_r, one_r               // Initalize iter = 1
 
             // Error-handling if file opened properly
             cmp     fd_r, 0                     // Check if file opened successfully
@@ -73,11 +74,13 @@ loop:       mov     w0, fd_r                    // 1st arg: file descriptor
             ldr     d0, [buf_base_r]            // d0 = x
             mov     flag_r, 1.0                 // Set flag for e^x = 1 (calculate #1)
             mov     d1, flag_r                  // d1 = flag_r
+            mov     d2, iter_r                  // d2 = iter #
             bl      calculate                   // Jump to calculate subroutine
 
             ldr     d0, [buf_base_r]            // d0 = x
             mov     flag_r, 2.0                 // Set flag for e^-x = 2 (calculate #2)
             mov     d1, flag_r                  // d1 = flag_r 
+            mov     d2, iter_r                  // d2 = iter #
             bl      calculate                   // Jump to calculate subroutine
 
             // Loop test
@@ -108,18 +111,35 @@ calculate:  stp     x29, x30, [sp, -16]!
             // Load in passed-in args
             fmov    top_r, d0                   // top = x
             fmov    flag_r, d1                  // flag (either 1 or 2)
-            fmov    power_r, i_r                // power = iteration #
-            b       fact_test
+            fmov    iter_r, d2                  
+            fmov    i_r, iter_r                 // i = iteration #
+            fmov    exp_r, iter_r               // exp = iteration #
+            b       calc_test
 
-            // Calculate bottom (factorial)
-fact_loop:  sub     temp_r, power_r, one_r      // temp = power - 1
-            mul     bottom_r, power_r, temp_r   // bottom = power * (power - 1)
+            // Calculate top (exponent)
+calc_loop:  fmul    top_r, top_r, top_r         // top = top * top
             
-fact_test:  cmp     temp_r, one_r               // If temp is <= 1, loop again
-            b.le    fact_top
+            // Calculate bottom (factorial)
+            fmov    bottom_r, i_r               // bottom = i
+            fmov    temp_r, i_r                 // temp = i
+            fsub    temp_r, temp_r, one_r       // temp = i - 1
+            fmul    bottom_r, bottom_r, temp_r  // bottom = i * (i - 1)
+            fsub    i_r, i_r, one_r             // i--
 
-            // Calculate top
-after_fact: 
+calc_test:  cmp     i_r, one_r                  // If i is > 1, loop again
+            b.gt    fact_top
+
+
+            // Calculate 
+after:      fdiv    term_r, top_r, bottom_r     // term = x^i / i!
+            fadd    accumulate_r, accumulate_r, term_r
+            fabs    accumulate_r, accumulate_r
+one:        cmp     flag_r, 1.0
+            b.eq    after2
+
+two:        fneg     
+
+after2:
 
 
 
