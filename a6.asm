@@ -2,15 +2,28 @@
 // Chantal del Carmen
 // Student #30129615
 
+//-----------------------------------------------------------------------------------------
+
             .data
-
-
+const_m:    .double 0r1.0e-10   
 
             .text
 define(fp, x29)
 define(fd_r, w19)
 define(buf_base_r, x20)
 define(n_read_r, x21)
+
+define(top_r, d3)
+define(bottom_r, d4)
+define(term_r, d5)
+define(accumulate_r, d6)
+define(one_r, d7)
+define(method_r, d8)
+define(power_r, d9)
+define(i_r, d10)
+define(flag_r, d11)
+define(const_r, d12)
+define(temp_r, d13)
 
 buf_size = 8
 alloc   = -(16 + buf_size) & -16
@@ -19,6 +32,9 @@ dealloc = -alloc
 buf_s = 16
 
 path_name:  .string "input.bin"
+
+//-----------------------------------------------------------------------------------------
+// MAIN
 
             .balign 4
             .global main
@@ -36,13 +52,15 @@ open_file:  mov     w0, -100                    // 1st argument
             svc     0                           // Supervisor call to system
             mov     fd_r, w0                    // fd (file descriptor) is in w0 and moved into fd reg
 
+            mov     i_r, one_r                  // Initalize i = 1
+
             // Error-handling if file opened properly
             cmp     fd_r, 0                     // Check if file opened successfully
-            b.ge    read_file                   // If fd is 0 or more, open successful
-                                                // Jump to read_file 
+            b.ge    test                        // If fd is 0 or more, open successful
+                                                // Jump to test 
 
             // Reading input file
-read_file:  mov     w0, fd_r                    // 1st arg: file descriptor
+loop:       mov     w0, fd_r                    // 1st arg: file descriptor
             add     buf_base_r, fp, buf_s       // 2nd arg: calculate buffer base address
             mov     x1, buf_base_r              // 2nd arg: a pointer to buffer
             mov     x2, 8                       // 3rd arg: number of bytes to read (must be <= buf_size)
@@ -52,10 +70,20 @@ read_file:  mov     w0, fd_r                    // 1st arg: file descriptor
                                                 // x0 = number of bytes actually read (n_read)
             mov     n_read_r, x0                // mov x0 into n_read reg
 
-            // Error-handling if file read in properly
-            cmp     n_read_r, buf_size          // n_read must be <= buf_size
-            b.gt    close_file                  // So if n_read > buf_size, jump to close_file
+            ldr     d0, [buf_base_r]            // d0 = x
+            mov     flag_r, 1.0                 // Set flag for e^x = 1 (calculate #1)
+            mov     d1, flag_r                  // d1 = flag_r
+            bl      calculate                   // Jump to calculate subroutine
 
+            ldr     d0, [buf_base_r]            // d0 = x
+            mov     flag_r, 2.0                 // Set flag for e^-x = 2 (calculate #2)
+            mov     d1, flag_r                  // d1 = flag_r 
+            bl      calculate                   // Jump to calculate subroutine
+
+            // Loop test
+test:       cmp     n_read_r, buf_size          // n_read must be <= buf_size
+            b.gt    close_file                  // So if n_read > buf_size, jump to close_file
+            b       loop                        // Otherwise, n_read <= buf_s -> jump to top of loop
 
 
 close_file: mov     w0, fd_r                    // 1st arg: fd
@@ -66,6 +94,41 @@ close_file: mov     w0, fd_r                    // 1st arg: fd
 
 
 end_main:   ldp     x29, x30, [sp], dealloc
+
+//-----------------------------------------------------------------------------------------
+// CALCULATE SUBROUTINE
+
+calculate:  stp     x29, x30, [sp, -16]!
+            mov     fp, sp
+
+            adrp    x19, const_m                // constant = 1.0e-10
+            add     x19, x19, :lo12:const_m     // First dereference the pointer "const_m" to obtain the 64-bit address (must be stored in x register)
+            ldr     const_r, [x19]              // const_r = loaded from the address to obtain the constant           
+            
+            // Load in passed-in args
+            fmov    top_r, d0                   // top = x
+            fmov    flag_r, d1                  // flag (either 1 or 2)
+            fmov    power_r, i_r                // power = iteration #
+            b       fact_test
+
+            // Calculate bottom (factorial)
+fact_loop:  sub     temp_r, power_r, one_r      // temp = power - 1
+            mul     bottom_r, power_r, temp_r   // bottom = power * (power - 1)
+            
+fact_test:  cmp     temp_r, one_r               // If temp is <= 1, loop again
+            b.le    fact_top
+
+            // Calculate top
+after_fact: 
+
+
+
+
+            
+            add     i_r, i_r, one_r             // i++
+
+end_calc:   ldp     x29, x30, [sp], 16
+
 
 
 
