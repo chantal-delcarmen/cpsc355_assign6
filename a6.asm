@@ -7,7 +7,10 @@
 
 
             .text
-define(fd, w19)
+define(fp, x29)
+define(fd_r, w19)
+define(buf_base_r, x20)
+define(n_read_r, x21)
 
 buf_size = 8
 alloc   = -(16 + buf_size) & -16
@@ -20,7 +23,7 @@ path_name:  .string "input.bin"
             .balign 4
             .global main
 main:       stp     x29, x30, [sp, alloc]!
-            mov     x29, sp
+            mov     fp, sp
 
             // Opening input file
             mov     w0, -100                    // 1st argument
@@ -31,22 +34,25 @@ main:       stp     x29, x30, [sp, alloc]!
             mov     x8, 56                      // Openat I/O request
 
             svc     0                           // Supervisor call to system
-            mov     fd, w0                      // fd (file descriptor) is in w0 and moved into fd reg
+            mov     fd_r, w0                    // fd (file descriptor) is in w0 and moved into fd reg
 
             // Error-handling
-            cmp     fd, 0                       // Check if file opened successfully
+            cmp     fd_r, 0                     // Check if file opened successfully
             b.ge    open_ok                     // If fd is 0 or more, open successful
                                                 // Jump to open_ok 
 
-            // File has opened successfully
-open_ok:    
-            mov     w0, fd
-            add     x1, x29, buf_s              // 2nd arg
-
-            mov     x2, 8                       // 3rd arg: number of bytes to write (must be <= buf_size)
-            mov     x8, 64                      // Write I/O request
+            // Reading file
+open_ok:    mov     w0, fd_r                    // 1st arg: file descriptor
+            add     buf_base_r, fp, buf_s       // Calculate buffer base address
+            mov     x1, buf_base_r              // 2nd arg: pointer to buffer
+            mov     x2, 8                       // 3rd arg: number of bytes to read (must be <= buf_size)
+            mov     x8, 63                      // Write I/O request
 
             svc     0                           // Call system function
+                                                // x0 = number of bytes actually read (n_read)
+            mov     n_read_r, x0                // mov x0 into n_read reg
+
+
 
             ldp     x29, x30, [sp], dealloc
 
