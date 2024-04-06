@@ -26,7 +26,7 @@ main:       stp     x29, x30, [sp, alloc]!
             mov     fp, sp
 
             // Opening input file
-            mov     w0, -100                    // 1st argument
+open_file:  mov     w0, -100                    // 1st argument
             adrp    x1, path_name               // 2nd argument: path_name
             add     x1, x1, :lo12:path_name
             mov     w2, 0                       // 3rd argument: read only
@@ -36,15 +36,15 @@ main:       stp     x29, x30, [sp, alloc]!
             svc     0                           // Supervisor call to system
             mov     fd_r, w0                    // fd (file descriptor) is in w0 and moved into fd reg
 
-            // Error-handling
+            // Error-handling if file opened properly
             cmp     fd_r, 0                     // Check if file opened successfully
-            b.ge    open_ok                     // If fd is 0 or more, open successful
-                                                // Jump to open_ok 
+            b.ge    read_file                   // If fd is 0 or more, open successful
+                                                // Jump to read_file 
 
-            // Reading file
-open_ok:    mov     w0, fd_r                    // 1st arg: file descriptor
-            add     buf_base_r, fp, buf_s       // Calculate buffer base address
-            mov     x1, buf_base_r              // 2nd arg: pointer to buffer
+            // Reading input file
+read_file:  mov     w0, fd_r                    // 1st arg: file descriptor
+            add     buf_base_r, fp, buf_s       // 2nd arg: calculate buffer base address
+            mov     x1, buf_base_r              // 2nd arg: a pointer to buffer
             mov     x2, 8                       // 3rd arg: number of bytes to read (must be <= buf_size)
             mov     x8, 63                      // Write I/O request
 
@@ -52,9 +52,20 @@ open_ok:    mov     w0, fd_r                    // 1st arg: file descriptor
                                                 // x0 = number of bytes actually read (n_read)
             mov     n_read_r, x0                // mov x0 into n_read reg
 
+            // Error-handling if file read in properly
+            cmp     n_read_r, buf_size          // n_read must be <= buf_size
+            b.gt    close_file                  // So if n_read > buf_size, jump to close_file
 
 
-            ldp     x29, x30, [sp], dealloc
+
+close_file: mov     w0, fd_r                    // 1st arg: fd
+            mov     x8, 57                      // Close I/O request
+
+            svc     0                           // Supervisor call
+                                                // Status is returned in w0
+
+
+end_main:   ldp     x29, x30, [sp], dealloc
 
 
 
