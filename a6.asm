@@ -20,7 +20,6 @@ define(accumulate_r, d6)
 define(factorial_r, d7)
 define(j_r, d8)
 define(exp_r, d9)
-define(i_r, d10)
 define(x_r, d11)
 define(const_r, d12)
 
@@ -31,6 +30,9 @@ dealloc = -alloc
 buf_s = 16
 
 path_name:  .string "input.bin"
+fmt_header: .string "Input:\t\te^(x):\t\te^(-x):\n"
+fmt_values: .string "%13.10f\t%13.10f  \t%13.10f\n"
+fmt_error:  .string "Error"
 
 //-----------------------------------------------------------------------------------------
 // MAIN
@@ -69,19 +71,22 @@ read_file:  mov     w0, fd_r                    // 1st arg: file descriptor
 
             cmp     n_read_r, buf_size          // n_read must be <= buf_size
             b.gt    close_file                  // So if n_read > buf_size, jump to close_file
-            
 
-loop:       ldr     d0, [buf_base_r]            // d0 = x
+            // Print header labels
+            ldr     x0, =fmt_header             
+            bl      printf
+
+top:        ldr     d0, [buf_base_r]            // d0 = x
             bl      calculate                   // Jump to calculate subroutine
 
             ldr     d0, [buf_base_r]            // d0 = x
             fneg    d0, d0                      // d0 = -x (negate x)
             bl      calculate                   // Jump to calculate subroutine
 
-            // TODO
+            // Printe values
+            ldr     x0, =fmt_values
 
-            // Loop test
-test:       b       loop                        // Otherwise, n_read <= buf_s -> jump to top of loop
+            b       top                        // Otherwise, n_read <= buf_s -> jump to top of loop
 
 
 close_file: mov     w0, fd_r                    // 1st arg: fd
@@ -91,6 +96,7 @@ close_file: mov     w0, fd_r                    // 1st arg: fd
                                                 // Status is returned in w0
 
 end_main:   ldp     x29, x30, [sp], dealloc
+            ret
 
 //-----------------------------------------------------------------------------------------
 // CALCULATE SUBROUTINE
@@ -103,11 +109,10 @@ calculate:  stp     x29, x30, [sp, -16]!
             ldr     const_r, [x19]                      // const_r = loaded from the address to obtain the constant           
             
             fmov    x_r, d0                             // x = d0 (passed in argument)
-            fmov    i_r, 1.0                            // i = 1
             fmov    j_r, 1.0                            // j = 1
             fmov    accumulate_r, 1.0                   // accumulate = 1
-            fmov    exp_r, i_r                          // exp = 1
-            fmov    factorial_r, i_r                    // factorial = 1!
+            fmov    exp_r, j_r                          // exp = 1
+            fmov    factorial_r, j_r                    // factorial = 1!
 
             fmov    top_r, x_r                          // top = x^1
             fmov    bottom_r, factorial_r               // bottom = 1!
@@ -119,17 +124,14 @@ calc_loop:  fmul    top_r, top_r, x_r                   // top = top * x
             fmul    bottom_r, factorial_r, j_r          // bottom = factorial * j
             fdiv    term_r, top_r, bottom_r             // term = top / bottom
             fadd    accumulate_r, accumulate_r, term_r  // accumulate += term
-            fabs    term, term                          // term = |term|
+            fabs    term_r, term_r                      // term = |term|
 
-            fsub    i_r, i_r, 1.0                       // i--            
+calc_test:  fcmp    term_r, const_r
+            b.ge    calc_loop
 
-calc_test:  cmp     i_r, 1.0
-            b.gt    calc_loop
-
-calc_after:            
-
-
-end_calc:   ldp     x29, x30, [sp], 16
+end_calc:   fmov    d0, accumulate_r                    // Pass accumulate into d0 to return value
+            ldp     x29, x30, [sp], 16
+            ret
 
 
 /*
