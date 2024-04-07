@@ -23,7 +23,6 @@ define(exp_r, d9)
 define(i_r, d10)
 define(x_r, d11)
 define(const_r, d12)
-define(temp_r, d13)
 
 buf_size = 8
 alloc   = -(16 + buf_size) & -16
@@ -99,32 +98,35 @@ end_main:   ldp     x29, x30, [sp], dealloc
 calculate:  stp     x29, x30, [sp, -16]!
             mov     fp, sp
 
-            adrp    x19, const_m                // constant = 1.0e-10
-            add     x19, x19, :lo12:const_m     // First dereference the pointer "const_m" to obtain the 64-bit address (must be stored in x register)
-            ldr     const_r, [x19]              // const_r = loaded from the address to obtain the constant           
+            adrp    x19, const_m                        // constant = 1.0e-10
+            add     x19, x19, :lo12:const_m             // First dereference the pointer "const_m" to obtain the 64-bit address (must be stored in x register)
+            ldr     const_r, [x19]                      // const_r = loaded from the address to obtain the constant           
             
-            fmov    x_r, d0                     // x = d0 (passed in argument)
-            fmov    i_r, 1.0                    // i = 1
-            fmov    j_r, 1.0                    // j = 1
-            fmov    accumulate_r, 1.0           // accumulate = 1
-            fmov    exp_r, i_r                  // exp = 1
-            fmov    factorial_r, i_r            // factorial = 1!
+            fmov    x_r, d0                             // x = d0 (passed in argument)
+            fmov    i_r, 1.0                            // i = 1
+            fmov    j_r, 1.0                            // j = 1
+            fmov    accumulate_r, 1.0                   // accumulate = 1
+            fmov    exp_r, i_r                          // exp = 1
+            fmov    factorial_r, i_r                    // factorial = 1!
 
-            fmov    top_r, x_r                  // top = x^1
-            fmov    bottom_r, factorial_r       // bottom = 1!
+            fmov    top_r, x_r                          // top = x^1
+            fmov    bottom_r, factorial_r               // bottom = 1!
 
             b       calc_test               
 
-calc_loop:  fmul    top_r, top_r, x_r           // top = top * x
-            fadd    j_r, j_r, 1.0               // j++
-            fmul    bottom_r, factorial_r, j_r  // bottom = factorial * j
-            fsub    i_r, i_r, 1.0               // i--            
+calc_loop:  fmul    top_r, top_r, x_r                   // top = top * x
+            fadd    j_r, j_r, 1.0                       // j++
+            fmul    bottom_r, factorial_r, j_r          // bottom = factorial * j
+            fdiv    term_r, top_r, bottom_r             // term = top / bottom
+            fadd    accumulate_r, accumulate_r, term_r  // accumulate += term
+            fabs    term, term                          // term = |term|
+
+            fsub    i_r, i_r, 1.0                       // i--            
 
 calc_test:  cmp     i_r, 1.0
             b.gt    calc_loop
 
-calc_after: fdiv    term_r, top_r, bottom_r     // term = top / bottom
-            fmov    d0, temp_r            
+calc_after:            
 
 
 end_calc:   ldp     x29, x30, [sp], 16
