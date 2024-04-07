@@ -17,14 +17,13 @@ define(top_r, d3)
 define(bottom_r, d4)
 define(term_r, d5)
 define(accumulate_r, d6)
-define(one_r, d7)
-define(method_r, d8)
+define(factorial_r, d7)
+define(j_r, d8)
 define(exp_r, d9)
 define(i_r, d10)
-define(flag_r, d11)
+define(x_r, d11)
 define(const_r, d12)
 define(temp_r, d13)
-define(iter_r, d14)
 
 buf_size = 8
 alloc   = -(16 + buf_size) & -16
@@ -53,15 +52,13 @@ open_file:  mov     w0, -100                    // 1st argument
             svc     0                           // Supervisor call to system
             mov     fd_r, w0                    // fd (file descriptor) is in w0 and moved into fd reg
 
-            mov     iter_r, one_r               // Initalize iter = 1
-
             // Error-handling if file opened properly
             cmp     fd_r, 0                     // Check if file opened successfully
             b.ge    test                        // If fd is 0 or more, open successful
                                                 // Jump to test 
 
             // Reading input file
-loop:       mov     w0, fd_r                    // 1st arg: file descriptor
+read_file:  mov     w0, fd_r                    // 1st arg: file descriptor
             add     buf_base_r, fp, buf_s       // 2nd arg: calculate buffer base address
             mov     x1, buf_base_r              // 2nd arg: a pointer to buffer
             mov     x2, 8                       // 3rd arg: number of bytes to read (must be <= buf_size)
@@ -71,22 +68,21 @@ loop:       mov     w0, fd_r                    // 1st arg: file descriptor
                                                 // x0 = number of bytes actually read (n_read)
             mov     n_read_r, x0                // mov x0 into n_read reg
 
-            ldr     d0, [buf_base_r]            // d0 = x
-            mov     flag_r, 1.0                 // Set flag for e^x = 1 (calculate #1)
-            mov     d1, flag_r                  // d1 = flag_r
-            mov     d2, iter_r                  // d2 = iter #
+            cmp     n_read_r, buf_size          // n_read must be <= buf_size
+            b.gt    close_file                  // So if n_read > buf_size, jump to close_file
+            
+
+loop:       ldr     d0, [buf_base_r]            // d0 = x
             bl      calculate                   // Jump to calculate subroutine
 
             ldr     d0, [buf_base_r]            // d0 = x
-            mov     flag_r, 2.0                 // Set flag for e^-x = 2 (calculate #2)
-            mov     d1, flag_r                  // d1 = flag_r 
-            mov     d2, iter_r                  // d2 = iter #
+            fneg    d0, d0                      // d0 = -x (negate x)
             bl      calculate                   // Jump to calculate subroutine
+
+            // TODO
 
             // Loop test
-test:       cmp     n_read_r, buf_size          // n_read must be <= buf_size
-            b.gt    close_file                  // So if n_read > buf_size, jump to close_file
-            b       loop                        // Otherwise, n_read <= buf_s -> jump to top of loop
+test:       b       loop                        // Otherwise, n_read <= buf_s -> jump to top of loop
 
 
 close_file: mov     w0, fd_r                    // 1st arg: fd
@@ -94,7 +90,6 @@ close_file: mov     w0, fd_r                    // 1st arg: fd
 
             svc     0                           // Supervisor call
                                                 // Status is returned in w0
-
 
 end_main:   ldp     x29, x30, [sp], dealloc
 
@@ -108,14 +103,34 @@ calculate:  stp     x29, x30, [sp, -16]!
             add     x19, x19, :lo12:const_m     // First dereference the pointer "const_m" to obtain the 64-bit address (must be stored in x register)
             ldr     const_r, [x19]              // const_r = loaded from the address to obtain the constant           
             
-            // Load in passed-in args
-            fmov    top_r, d0                   // top = x
-            fmov    flag_r, d1                  // flag (either 1 or 2)
-            fmov    iter_r, d2                  
-            fmov    i_r, iter_r                 // i = iteration #
-            fmov    exp_r, iter_r               // exp = iteration #
-            b       calc_test
+            fmov    x_r, d0                     // x = d0 (passed in argument)
+            fmov    i_r, 1.0                    // i = 1
+            fmov    j_r, 1.0                    // j = 1
+            fmov    accumulate_r, 1.0           // accumulate = 1
+            fmov    exp_r, i_r                  // exp = 1
+            fmov    factorial_r, i_r            // factorial = 1!
 
+            fmov    top_r, x_r                  // top = x^1
+            fmov    bottom_r, factorial_r       // bottom = 1!
+
+            b       calc_test               
+
+calc_loop:  fmul    top_r, top_r, x_r           // top = top * x
+            fadd    j_r, j_r, 1.0               // j++
+            fmul    bottom_r, factorial_r, j_r  // bottom = factorial * j
+            fsub    i_r, i_r, 1.0               // i--            
+
+calc_test:  cmp     i_r, 1.0
+            b.gt    calc_loop
+
+calc_after: fdiv    term_r, top_r, bottom_r     // term = top / bottom
+            fmov    d0, temp_r            
+
+
+end_calc:   ldp     x29, x30, [sp], 16
+
+
+/*
             // Calculate top (exponent)
 calc_loop:  fmul    top_r, top_r, top_r         // top = top * top
             
@@ -141,13 +156,13 @@ two:        fneg
 
 after2:
 
+            add     i_r, i_r, 1.0               // i++
+ */
 
 
 
-            
-            add     i_r, i_r, one_r             // i++
 
-end_calc:   ldp     x29, x30, [sp], 16
+
 
 
 
